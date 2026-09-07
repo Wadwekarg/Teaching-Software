@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
+import { ReferenceDoc } from '../../types';
+import { DEFAULT_REFERENCE_DOCS, generateQuestionsFromDoc, GeneratedQuestion } from '../../data/referenceDecks';
 import { PRESET_QUIZZES } from '../../data/commerceCurriculum';
-import { CheckCircle2, XCircle, RotateCcw, Award, Sparkles, Copy, Check, Eye } from 'lucide-react';
-
-interface Props {
-  initialTopic?: string;
-  onToast?: (msg: string) => void;
-  onSpeak?: (text: string) => void;
-}
+import {
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  Award,
+  Sparkles,
+  Copy,
+  Check,
+  Eye,
+  FileText,
+} from 'lucide-react';
 
 interface QuestionItem {
   id: number;
@@ -17,49 +23,102 @@ interface QuestionItem {
   explanation: string;
 }
 
+interface Props {
+  initialTopic?: string;
+  availableDocs?: ReferenceDoc[];
+  injectedQuestions?: GeneratedQuestion[] | null;
+  sourceDocName?: string;
+  onToast?: (msg: string) => void;
+  onSpeak?: (text: string) => void;
+}
+
 export const QuizMakerScreen: React.FC<Props> = ({
   initialTopic = 'Demand Elasticity & Determinants',
+  availableDocs = DEFAULT_REFERENCE_DOCS,
+  injectedQuestions = null,
+  sourceDocName = '',
   onToast = (_msg: string) => {},
   onSpeak = (_text: string) => {},
 }) => {
+  const [sourceType, setSourceType] = useState<'topic' | 'reference'>(
+    injectedQuestions ? 'reference' : 'topic'
+  );
+  const [selectedDocId, setSelectedDocId] = useState<string>(availableDocs[0]?.id || '');
   const [topic, setTopic] = useState<string>(initialTopic);
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [mode, setMode] = useState<'interactive' | 'text'>('interactive');
+  const [currentSourceLabel, setCurrentSourceLabel] = useState<string>(sourceDocName || '');
+
   const [questions, setQuestions] = useState<QuestionItem[]>([
     {
       id: 1,
-      question: 'When the percentage change in quantity demanded is exactly equal to the percentage change in price, what is the elasticity of demand (Ed)?',
-      options: ['Ed = 0 (Perfect Inelastic)', 'Ed = 1 (Unitary Elastic)', 'Ed > 1 (Highly Elastic)', 'Ed = ∞ (Perfect Elastic)'],
+      question:
+        'When the percentage change in quantity demanded is exactly equal to the percentage change in price, what is the elasticity of demand (Ed)?',
+      options: [
+        'Ed = 0 (Perfect Inelastic)',
+        'Ed = 1 (Unitary Elastic)',
+        'Ed > 1 (Highly Elastic)',
+        'Ed = ∞ (Perfect Elastic)',
+      ],
       answer: 1,
-      explanation: 'Unitary elastic demand occurs when proportional change in demand exactly mirrors proportional change in price (Ed = 1). The demand curve forms a rectangular hyperbola.',
+      explanation:
+        'Unitary elastic demand occurs when proportional change in demand exactly mirrors proportional change in price (Ed = 1). The demand curve forms a rectangular hyperbola.',
     },
     {
       id: 2,
-      question: 'Which of the following commodities is likely to have highly INELASTIC demand in the short run?',
-      options: ['Luxury sports car', 'Life-saving insulin injection', 'Branded designer footwear', 'Air conditioning unit'],
+      question:
+        'Which of the following commodities is likely to have highly INELASTIC demand in the short run?',
+      options: [
+        'Luxury sports car',
+        'Life-saving insulin injection',
+        'Branded designer footwear',
+        'Air conditioning unit',
+      ],
       answer: 1,
-      explanation: 'Necessities with no close substitutes (such as life-saving medicine or salt) exhibit highly inelastic demand because consumers must buy them regardless of price.',
+      explanation:
+        'Necessities with no close substitutes (such as life-saving medicine or salt) exhibit highly inelastic demand because consumers must buy them regardless of price.',
     },
     {
       id: 3,
-      question: 'What happens to Total Expenditure when price of a good falls and its price elasticity of demand is GREATER than 1 (Ed > 1)?',
-      options: ['Total Expenditure decreases', 'Total Expenditure remains unchanged', 'Total Expenditure increases', 'Total Expenditure drops to zero'],
+      question:
+        'What happens to Total Expenditure when price of a good falls and its price elasticity of demand is GREATER than 1 (Ed > 1)?',
+      options: [
+        'Total Expenditure decreases',
+        'Total Expenditure remains unchanged',
+        'Total Expenditure increases',
+        'Total Expenditure drops to zero',
+      ],
       answer: 2,
-      explanation: 'By Total Outlay method, when demand is elastic (Ed > 1), a price drop causes a more than proportionate rise in quantity demanded, raising total expenditure.',
+      explanation:
+        'By Total Outlay method, when demand is elastic (Ed > 1), a price drop causes a more than proportionate rise in quantity demanded, raising total expenditure.',
     },
     {
       id: 4,
-      question: 'If two goods X and Y have a positive Cross Price Elasticity of Demand (Exy > 0), what is their relationship?',
-      options: ['They are substitute goods (e.g. Tea & Coffee)', 'They are complementary goods (e.g. Car & Petrol)', 'They are completely unrelated goods', 'They are Giffen inferior goods'],
+      question:
+        'If two goods X and Y have a positive Cross Price Elasticity of Demand (Exy > 0), what is their relationship?',
+      options: [
+        'They are substitute goods (e.g. Tea & Coffee)',
+        'They are complementary goods (e.g. Car & Petrol)',
+        'They are completely unrelated goods',
+        'They are Giffen inferior goods',
+      ],
       answer: 0,
-      explanation: 'A rise in the price of tea leads to an increase in demand for coffee; hence substitute goods possess positive cross price elasticity.',
+      explanation:
+        'A rise in the price of tea leads to an increase in demand for coffee; hence substitute goods possess positive cross price elasticity.',
     },
     {
       id: 5,
-      question: 'What is the shape of a demand curve exhibiting perfectly elastic demand parallel to?',
-      options: ['Vertical Y-axis', 'Horizontal X-axis', 'Downsloping straight line at 45 degrees', 'Convex to origin'],
+      question:
+        'What is the shape of a demand curve exhibiting perfectly elastic demand parallel to?',
+      options: [
+        'Vertical Y-axis',
+        'Horizontal X-axis',
+        'Downsloping straight line at 45 degrees',
+        'Convex to origin',
+      ],
       answer: 1,
-      explanation: 'Under perfect competition or perfectly elastic conditions, the demand curve is a horizontal straight line parallel to the X-axis (Ed = ∞).',
+      explanation:
+        'Under perfect competition or perfectly elastic conditions, the demand curve is a horizontal straight line parallel to the X-axis (Ed = ∞).',
     },
   ]);
 
@@ -67,8 +126,32 @@ export const QuizMakerScreen: React.FC<Props> = ({
   const [showExplanation, setShowExplanation] = useState<Record<number, boolean>>({});
   const [isCopied, setIsCopied] = useState<boolean>(false);
 
+  // Sync injected questions if passed from ReferenceLibraryScreen
+  useEffect(() => {
+    if (injectedQuestions && injectedQuestions.length > 0) {
+      const mapped: QuestionItem[] = injectedQuestions
+        .filter((q) => q.options && q.options.length > 0)
+        .map((q, idx) => ({
+          id: idx + 1,
+          question: q.question,
+          options: q.options || [],
+          answer: typeof q.answer === 'number' ? q.answer : 0,
+          explanation: q.explanation,
+        }));
+
+      if (mapped.length > 0) {
+        setQuestions(mapped);
+        setSourceType('reference');
+        setCurrentSourceLabel(sourceDocName || 'Uploaded Reference Material');
+        setUserSelections({});
+        setShowExplanation({});
+        onToast(`Loaded ${mapped.length} questions from "${sourceDocName || 'Material'}"!`);
+      }
+    }
+  }, [injectedQuestions, sourceDocName]);
+
   const handleOptionClick = (qIndex: number, optIndex: number) => {
-    if (userSelections[qIndex] !== undefined) return; // already answered
+    if (userSelections[qIndex] !== undefined) return;
 
     setUserSelections((prev) => ({ ...prev, [qIndex]: optIndex }));
     setShowExplanation((prev) => ({ ...prev, [qIndex]: true }));
@@ -87,12 +170,36 @@ export const QuizMakerScreen: React.FC<Props> = ({
   };
 
   const generateNewQuiz = () => {
-    // Check if topic matches preset economics or commerce
-    const matchedCategory = topic.toLowerCase().includes('partner') || topic.toLowerCase().includes('account')
-      ? 'accountancy'
-      : topic.toLowerCase().includes('business') || topic.toLowerCase().includes('manage')
-      ? 'business'
-      : 'economics';
+    if (sourceType === 'reference') {
+      const doc = availableDocs.find((d) => d.id === selectedDocId) || availableDocs[0];
+      if (doc) {
+        const gen = generateQuestionsFromDoc(doc, questionCount);
+        const mapped: QuestionItem[] = gen
+          .filter((q) => q.options && q.options.length > 0)
+          .map((q, idx) => ({
+            id: idx + 1,
+            question: q.question,
+            options: q.options || [],
+            answer: typeof q.answer === 'number' ? q.answer : 0,
+            explanation: q.explanation,
+          }));
+
+        setQuestions(mapped);
+        setCurrentSourceLabel(doc.name);
+        setUserSelections({});
+        setShowExplanation({});
+        onToast(`Synthesized ${mapped.length} questions from ${doc.name}!`);
+        return;
+      }
+    }
+
+    // Default Topic Keyword Generator
+    const matchedCategory =
+      topic.toLowerCase().includes('partner') || topic.toLowerCase().includes('account')
+        ? 'accountancy'
+        : topic.toLowerCase().includes('business') || topic.toLowerCase().includes('manage')
+        ? 'business'
+        : 'economics';
 
     const preset = PRESET_QUIZZES[matchedCategory] || PRESET_QUIZZES.economics;
 
@@ -123,6 +230,7 @@ export const QuizMakerScreen: React.FC<Props> = ({
     }
 
     setQuestions(newQs);
+    setCurrentSourceLabel('');
     setUserSelections({});
     setShowExplanation({});
     onToast(`Generated ${newQs.length} board checkpoint questions!`);
@@ -145,7 +253,9 @@ export const QuizMakerScreen: React.FC<Props> = ({
   };
 
   const formatTextExport = () => {
-    let s = `CLASSROOM CHECKPOINT QUIZ — ${topic.toUpperCase()}\n\n`;
+    let s = `CLASSROOM CHECKPOINT QUIZ — ${
+      currentSourceLabel ? currentSourceLabel.toUpperCase() : topic.toUpperCase()
+    }\n\n`;
     questions.forEach((q, i) => {
       s += `Q${i + 1}. ${q.question}\n`;
       q.options.forEach((opt, oIdx) => {
@@ -175,9 +285,14 @@ export const QuizMakerScreen: React.FC<Props> = ({
             <h2 className="text-[24px] font-extrabold text-[#0f172a] mb-1.5 tracking-tight flex items-center gap-2">
               <span>❓</span>
               <span>Classroom Quiz Maker</span>
+              {currentSourceLabel && (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300">
+                  Source: {currentSourceLabel}
+                </span>
+              )}
             </h2>
             <p className="text-[#64748b] text-[15px]">
-              Produce 5 to 20 multiple choice questions on the board for instant interactive student engagement.
+              Produce multiple-choice checkpoint questions from uploaded reference documents or syllabus topics for interactive student response.
             </p>
           </div>
 
@@ -185,7 +300,9 @@ export const QuizMakerScreen: React.FC<Props> = ({
             <button
               onClick={() => setMode('interactive')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                mode === 'interactive' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                mode === 'interactive'
+                  ? 'bg-white text-blue-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Interactive Board View
@@ -193,7 +310,9 @@ export const QuizMakerScreen: React.FC<Props> = ({
             <button
               onClick={() => setMode('text')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                mode === 'text' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                mode === 'text'
+                  ? 'bg-white text-blue-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Print & Export Text
@@ -201,19 +320,65 @@ export const QuizMakerScreen: React.FC<Props> = ({
           </div>
         </div>
 
+        {/* Source Selector: From Reference Doc vs Custom Topic */}
+        <div className="mb-4 flex items-center gap-2">
+          <button
+            onClick={() => setSourceType('reference')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+              sourceType === 'reference'
+                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>From Uploaded Reference Material ({availableDocs.length})</span>
+          </button>
+          <button
+            onClick={() => setSourceType('topic')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+              sourceType === 'topic'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Custom Topic Keyword</span>
+          </button>
+        </div>
+
         {/* Inputs */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-          <div className="md:col-span-8">
-            <label className="block text-[14px] font-bold text-[#475569] mb-1.5">Topic</label>
-            <input
-              id="qTopic"
-              type="text"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g. Demand Elasticity & Determinants"
-              className="w-full border-[1.5px] border-[#cbd5e1] rounded-xl px-4 py-3 text-[15px] bg-white focus:outline-blue-600"
-            />
-          </div>
+          {sourceType === 'reference' ? (
+            <div className="md:col-span-8">
+              <label className="block text-[14px] font-bold text-[#475569] mb-1.5">
+                Choose Uploaded Document
+              </label>
+              <select
+                value={selectedDocId}
+                onChange={(e) => setSelectedDocId(e.target.value)}
+                className="w-full border-[1.5px] border-[#cbd5e1] rounded-xl px-4 py-3 text-[15px] bg-white font-medium focus:outline-blue-600 cursor-pointer"
+              >
+                {availableDocs.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.name} ({doc.category})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="md:col-span-8">
+              <label className="block text-[14px] font-bold text-[#475569] mb-1.5">Topic</label>
+              <input
+                id="qTopic"
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g. Demand Elasticity & Determinants"
+                className="w-full border-[1.5px] border-[#cbd5e1] rounded-xl px-4 py-3 text-[15px] bg-white focus:outline-blue-600"
+              />
+            </div>
+          )}
+
           <div className="md:col-span-2">
             <label className="block text-[14px] font-bold text-[#475569] mb-1.5">Questions</label>
             <input
@@ -226,13 +391,14 @@ export const QuizMakerScreen: React.FC<Props> = ({
               className="w-full border-[1.5px] border-[#cbd5e1] rounded-xl px-4 py-3 text-[15px] bg-white focus:outline-blue-600"
             />
           </div>
+
           <div className="md:col-span-2">
             <button
               onClick={generateNewQuiz}
               className="w-full px-4 py-3.5 rounded-xl bg-[#2563eb] text-white hover:bg-[#1d4ed8] text-[14px] font-bold shadow-md shadow-[#2563eb]/20 transition cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4" />
-              Generate
+              <span>Generate</span>
             </button>
           </div>
         </div>
@@ -243,7 +409,8 @@ export const QuizMakerScreen: React.FC<Props> = ({
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
                 <Award className="w-5 h-5 text-amber-400" />
-                Score: <span className="text-xl text-blue-400">{calculateScore()}</span> / {questions.length}
+                Score: <span className="text-xl text-blue-400">{calculateScore()}</span> /{' '}
+                {questions.length}
               </div>
               <div className="text-xs text-slate-400">
                 Answered: {answeredCount} of {questions.length}
@@ -289,15 +456,19 @@ export const QuizMakerScreen: React.FC<Props> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {q.options.map((opt, optIdx) => {
                       const letter = String.fromCharCode(65 + optIdx);
-                      let styleClasses = 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-800';
+                      let styleClasses =
+                        'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-800';
 
                       if (isAnswered) {
                         if (optIdx === q.answer) {
-                          styleClasses = 'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-2 ring-emerald-500/30';
+                          styleClasses =
+                            'bg-emerald-50 border-emerald-500 text-emerald-950 font-bold ring-2 ring-emerald-500/30';
                         } else if (selectedOpt === optIdx) {
-                          styleClasses = 'bg-red-50 border-red-500 text-red-950 ring-2 ring-red-500/30';
+                          styleClasses =
+                            'bg-red-50 border-red-500 text-red-950 ring-2 ring-red-500/30';
                         } else {
-                          styleClasses = 'bg-slate-50/50 border-slate-200 text-slate-400 opacity-60';
+                          styleClasses =
+                            'bg-slate-50/50 border-slate-200 text-slate-400 opacity-60';
                         }
                       }
 

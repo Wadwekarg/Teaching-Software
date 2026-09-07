@@ -1,4 +1,5 @@
 import pptxgen from 'pptxgenjs';
+import { SlideDeck } from '../types';
 
 export interface PPTXOptions {
   title: string;
@@ -6,6 +7,7 @@ export interface PPTXOptions {
   subject: string;
   slidesCount: number;
 }
+
 
 export async function generateNativePPTX(options: PPTXOptions): Promise<string> {
   const { title, gradeClass, subject, slidesCount } = options;
@@ -374,3 +376,225 @@ export async function generateNativePPTX(options: PPTXOptions): Promise<string> 
   await pptx.writeFile({ fileName: filename });
   return `Successfully created and downloaded "${filename}" in 16:9 widescreen format!`;
 }
+
+/**
+ * Exports a full custom SlideDeck (such as one generated from uploaded reference materials)
+ * to a downloadable widescreen .pptx presentation file.
+ */
+export async function exportCustomDeckPPTX(deck: SlideDeck): Promise<string> {
+  const pptx = new pptxgen();
+  pptx.layout = 'LAYOUT_16x9';
+  pptx.author = 'Smart Teaching Studio';
+  pptx.company = 'Interactive Panel Touch Edition';
+  pptx.title = `${deck.subject}: ${deck.title}`;
+
+  deck.slides.forEach((s) => {
+    const slide = pptx.addSlide();
+
+    if (s.type === 'cover') {
+      slide.background = { color: '0F172A' };
+      slide.addText('SMART TEACHING STUDIO • PANEL TOUCH EDITION', {
+        x: 0.8,
+        y: 0.8,
+        w: 10,
+        h: 0.4,
+        fontSize: 13,
+        color: '60A5FA',
+        bold: true,
+        fontFace: 'Segoe UI',
+      });
+      slide.addText(s.title, {
+        x: 0.8,
+        y: 1.6,
+        w: 11.5,
+        h: 1.8,
+        fontSize: 34,
+        color: 'FFFFFF',
+        bold: true,
+        fontFace: 'Segoe UI',
+      });
+      if (s.subtitle) {
+        slide.addText(s.subtitle, {
+          x: 0.8,
+          y: 3.5,
+          w: 10,
+          h: 0.6,
+          fontSize: 18,
+          color: '94A3B8',
+          fontFace: 'Segoe UI',
+        });
+      }
+      if (deck.sourceDocName) {
+        slide.addText(`Prepared from Reference: ${deck.sourceDocName}`, {
+          x: 0.8,
+          y: 4.6,
+          w: 9,
+          h: 0.5,
+          fontSize: 13,
+          color: '38BDF8',
+          fontFace: 'Segoe UI',
+        });
+      }
+      return;
+    }
+
+    // Non-cover slide
+    slide.background = { color: 'F8FAFC' };
+
+    // Header Title
+    slide.addText(s.title, {
+      x: 0.8,
+      y: 0.5,
+      w: 11.5,
+      h: 0.7,
+      fontSize: 22,
+      bold: true,
+      color: '0F172A',
+      fontFace: 'Segoe UI',
+    });
+
+    if (s.subtitle) {
+      slide.addText(s.subtitle, {
+        x: 0.8,
+        y: 1.1,
+        w: 11.5,
+        h: 0.4,
+        fontSize: 13,
+        color: '64748B',
+        fontFace: 'Segoe UI',
+      });
+    }
+
+    // Divider
+    slide.addShape(pptx.ShapeType.line, {
+      x: 0.8,
+      y: 1.5,
+      w: 11.7,
+      h: 0,
+      line: { color: '2563EB', width: 2.5 },
+    });
+
+    // Bullet Points
+    if (s.bulletPoints && s.bulletPoints.length > 0) {
+      s.bulletPoints.forEach((pt, pIdx) => {
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: 0.8,
+          y: 1.8 + pIdx * 0.9,
+          w: 11.7,
+          h: 0.75,
+          fill: { color: 'FFFFFF' },
+          line: { color: 'CBD5E1', width: 1 },
+        });
+        slide.addText(pt, {
+          x: 1.1,
+          y: 1.8 + pIdx * 0.9,
+          w: 11.2,
+          h: 0.75,
+          fontSize: 13,
+          color: '1E293B',
+          fontFace: 'Segoe UI',
+        });
+      });
+    }
+
+    // Table
+    if (s.tableHeaders && s.tableRows) {
+      const tableData = [
+        s.tableHeaders.map((h) => ({
+          text: h,
+          options: { bold: true, fill: { color: '0F172A' }, color: 'FFFFFF' },
+        })),
+        ...s.tableRows.map((r) => r.map((c) => ({ text: c }))),
+      ];
+
+      slide.addTable(tableData as any, {
+        x: 0.8,
+        y: 1.8,
+        w: 11.7,
+        h: 3.2,
+        fontSize: 12,
+        border: { color: 'CBD5E1', pt: 1 },
+        fill: { color: 'FFFFFF' },
+        autoPage: false,
+      });
+    }
+
+    // Callout Box
+    if (s.calloutBox) {
+      const yPos = s.tableRows ? 5.2 : s.bulletPoints ? 1.8 + s.bulletPoints.length * 0.95 : 2.0;
+      const isRed = s.calloutBox.tone === 'red';
+      const isEmerald = s.calloutBox.tone === 'emerald';
+      const bgColor = isRed ? 'FEF2F2' : isEmerald ? 'ECFDF5' : 'EFF6FF';
+      const borderColor = isRed ? 'EF4444' : isEmerald ? '10B981' : '3B82F6';
+      const textColor = isRed ? '991B1B' : isEmerald ? '065F46' : '1E40AF';
+
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: 0.8,
+        y: Math.min(yPos, 5.5),
+        w: 11.7,
+        h: 1.1,
+        fill: { color: bgColor },
+        line: { color: borderColor, width: 1.5 },
+      });
+      slide.addText(`${s.calloutBox.title}: ${s.calloutBox.text}`, {
+        x: 1.1,
+        y: Math.min(yPos, 5.5),
+        w: 11.2,
+        h: 1.1,
+        fontSize: 12,
+        bold: true,
+        color: textColor,
+        fontFace: 'Segoe UI',
+      });
+    }
+
+    // Quiz slide
+    if (s.quizQuestion) {
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x: 0.8,
+        y: 1.8,
+        w: 11.7,
+        h: 1.2,
+        fill: { color: '1E293B' },
+        line: { color: '334155', width: 1.5 },
+      });
+      slide.addText(s.quizQuestion.question, {
+        x: 1.1,
+        y: 1.8,
+        w: 11.2,
+        h: 1.2,
+        fontSize: 15,
+        bold: true,
+        color: 'FFFFFF',
+        fontFace: 'Segoe UI',
+      });
+
+      s.quizQuestion.options.forEach((opt, oIdx) => {
+        const isAnswer = oIdx === s.quizQuestion?.answerIndex;
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: 0.8,
+          y: 3.2 + oIdx * 0.7,
+          w: 11.7,
+          h: 0.55,
+          fill: { color: isAnswer ? 'EFF6FF' : 'FFFFFF' },
+          line: { color: isAnswer ? '2563EB' : 'CBD5E1', width: 1.5 },
+        });
+        slide.addText(opt, {
+          x: 1.1,
+          y: 3.2 + oIdx * 0.7,
+          w: 11.2,
+          h: 0.55,
+          fontSize: 13,
+          color: isAnswer ? '1E40AF' : '334155',
+          bold: isAnswer,
+          fontFace: 'Segoe UI',
+        });
+      });
+    }
+  });
+
+  const filename = `SmartTeaching_${deck.title.replace(/[^a-z0-9]+/gi, '_')}.pptx`;
+  await pptx.writeFile({ fileName: filename });
+  return `Successfully exported and downloaded "${filename}" from reference material!`;
+}
+

@@ -2,5 +2,7 @@
   "name": "Smart Teaching Studio",
   "description": "Interactive panel touch teaching studio for Class 11-12 Commerce with live whiteboard, AI lesson planner, quiz maker, PPT generator, and voice teacher.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { PageId, LessonPlan } from './types';
+import { PageId, LessonPlan, ReferenceDoc, SlideDeck } from './types';
+import { DEFAULT_REFERENCE_DOCS, GeneratedQuestion } from './data/referenceDecks';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { InstallGuideModal } from './components/InstallGuideModal';
@@ -19,17 +20,17 @@ import { SettingsScreen } from './components/screens/SettingsScreen';
 
 const PAGE_TITLES: Record<PageId, string> = {
   home: 'Smart Teaching Studio',
-  board: 'Interactive Whiteboard (Full Drawing Space)',
+  board: 'Interactive Whiteboard (Full Drawing Space & PPT On Board)',
   subjects: 'My Subjects',
   lessons: 'My Lessons',
   ai: 'AI Classroom Teacher',
   notes: 'Notes Maker',
-  ppt: 'PowerPoint Maker (Local Bridge & Native .pptx)',
-  quiz: 'Classroom Quiz Maker',
+  ppt: 'PowerPoint Maker (From Reference Material & Native .pptx)',
+  quiz: 'Classroom Quiz Maker (From Reference Docs & Topics)',
   planner: 'Lesson Planner',
   voice: 'Voice Teacher (Panel Audio)',
   talk: 'Talk to AI Assistant',
-  refs: 'Reference Library',
+  refs: 'Reference Library & Material Studio',
   settings: 'Panel & Display Settings',
 };
 
@@ -73,6 +74,20 @@ export default function App() {
   const [savedLessons, setSavedLessons] = useState<LessonPlan[]>(INITIAL_SAVED_LESSONS);
   const [currentSubject, setCurrentSubject] = useState<string>('Accountancy');
   const [currentTopic, setCurrentTopic] = useState<string>('Partnership - Goodwill Valuation by Super Profit');
+
+  // Shared Reference Docs State
+  const [referenceDocs, setReferenceDocs] = useState<ReferenceDoc[]>(DEFAULT_REFERENCE_DOCS);
+
+  // Active PPT Deck for Whiteboard presentation
+  const [activeDeck, setActiveDeck] = useState<SlideDeck | null>(null);
+
+  // Inter-screen payload for Quiz Maker
+  const [injectedQuizQuestions, setInjectedQuizQuestions] = useState<GeneratedQuestion[] | null>(null);
+  const [injectedQuizDocName, setInjectedQuizDocName] = useState<string>('');
+
+  // Inter-screen payload for PPT Maker
+  const [selectedRefForPPT, setSelectedRefForPPT] = useState<ReferenceDoc | null>(null);
+
   const [installGuideOpen, setInstallGuideOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -98,6 +113,27 @@ export default function App() {
   const handleStartActiveLesson = (lesson: LessonPlan) => {
     setActiveLesson(lesson);
     setSavedLessons((prev) => [lesson, ...prev.filter((l) => l.id !== lesson.id)]);
+  };
+
+  // Handler to open and present PPT slides directly on whiteboard
+  const handleTeachDeckOnWhiteboard = (deck: SlideDeck) => {
+    setActiveDeck(deck);
+    setCurrentPage('board');
+    showToast(`Loaded "${deck.title}" onto Whiteboard. Ready for stylus annotations!`);
+  };
+
+  // Handler to send generated questions into Quiz Maker
+  const handleSendQuestionsToQuiz = (questions: GeneratedQuestion[], docName: string) => {
+    setInjectedQuizQuestions(questions);
+    setInjectedQuizDocName(docName);
+    setCurrentPage('quiz');
+    showToast(`Sent ${questions.length} questions from "${docName}" to Quiz Maker!`);
+  };
+
+  // Handler to navigate to PPT Maker with a selected reference document
+  const handleNavigateToPPTMaker = (doc: ReferenceDoc) => {
+    setSelectedRefForPPT(doc);
+    setCurrentPage('ppt');
   };
 
   return (
@@ -137,6 +173,9 @@ export default function App() {
           {currentPage === 'board' && (
             <WhiteboardScreen
               initialTopic={currentTopic}
+              activeDeck={activeDeck}
+              availableDocs={referenceDocs}
+              onSelectDeck={(d) => setActiveDeck(d)}
               onToast={showToast}
             />
           )}
@@ -180,6 +219,9 @@ export default function App() {
             <PPTMakerScreen
               initialSubject={currentSubject}
               initialTopic={currentTopic}
+              availableDocs={referenceDocs}
+              selectedRefDoc={selectedRefForPPT}
+              onTeachDeckOnWhiteboard={handleTeachDeckOnWhiteboard}
               onToast={showToast}
             />
           )}
@@ -187,6 +229,9 @@ export default function App() {
           {currentPage === 'quiz' && (
             <QuizMakerScreen
               initialTopic={currentTopic}
+              availableDocs={referenceDocs}
+              injectedQuestions={injectedQuizQuestions}
+              sourceDocName={injectedQuizDocName}
               onToast={showToast}
               onSpeak={handleSpeak}
             />
@@ -214,7 +259,14 @@ export default function App() {
           )}
 
           {currentPage === 'refs' && (
-            <ReferenceLibraryScreen onToast={showToast} />
+            <ReferenceLibraryScreen
+              docs={referenceDocs}
+              onUpdateDocs={(d) => setReferenceDocs(d)}
+              onTeachDeckOnWhiteboard={handleTeachDeckOnWhiteboard}
+              onSendQuestionsToQuiz={handleSendQuestionsToQuiz}
+              onNavigateToPPTMaker={handleNavigateToPPTMaker}
+              onToast={showToast}
+            />
           )}
 
           {currentPage === 'settings' && (

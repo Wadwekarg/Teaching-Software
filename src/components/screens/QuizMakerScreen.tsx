@@ -3,6 +3,7 @@ import confetti from 'canvas-confetti';
 import { ReferenceDoc } from '../../types';
 import { DEFAULT_REFERENCE_DOCS, generateQuestionsFromDoc, GeneratedQuestion } from '../../data/referenceDecks';
 import { PRESET_QUIZZES } from '../../data/commerceCurriculum';
+import { getPastPaperAnalysis } from '../../data/pastPapersData';
 import {
   CheckCircle2,
   XCircle,
@@ -40,7 +41,7 @@ export const QuizMakerScreen: React.FC<Props> = ({
   onToast = (_msg: string) => {},
   onSpeak = (_text: string) => {},
 }) => {
-  const [sourceType, setSourceType] = useState<'topic' | 'reference'>(
+  const [sourceType, setSourceType] = useState<'topic' | 'reference' | 'pyq'>(
     injectedQuestions ? 'reference' : 'topic'
   );
   const [selectedDocId, setSelectedDocId] = useState<string>(availableDocs[0]?.id || '');
@@ -189,6 +190,28 @@ export const QuizMakerScreen: React.FC<Props> = ({
         setUserSelections({});
         setShowExplanation({});
         onToast(`Synthesized ${mapped.length} questions from ${doc.name}!`);
+        return;
+      }
+    }
+
+    if (sourceType === 'pyq') {
+      const pyqAnalysis = getPastPaperAnalysis(topic, 'Accountancy', 'Class 12');
+      const mapped: QuestionItem[] = pyqAnalysis.questions
+        .filter((q) => q.options && q.options.length > 0)
+        .map((q, idx) => ({
+          id: idx + 1,
+          question: `[${q.yearCitation}] ${q.question}`,
+          options: q.options || [],
+          answer: q.correctAnswerIndex ?? 0,
+          explanation: `${q.answerText || ''} Marking Scheme: ${q.markingSchemeSteps.join('; ')}`,
+        }));
+
+      if (mapped.length > 0) {
+        setQuestions(mapped);
+        setCurrentSourceLabel(`CBSE 2020–2024 Archive: ${pyqAnalysis.topic}`);
+        setUserSelections({});
+        setShowExplanation({});
+        onToast(`Loaded ${mapped.length} authentic past 5-year CBSE board questions!`);
         return;
       }
     }
@@ -343,6 +366,16 @@ export const QuizMakerScreen: React.FC<Props> = ({
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Custom Topic Keyword</span>
+          </button>
+          <button
+            onClick={() => setSourceType('pyq')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border ${
+              sourceType === 'pyq'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            <span>🎯 Past 5-Yr Papers (2020–2024)</span>
           </button>
         </div>
 

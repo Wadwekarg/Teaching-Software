@@ -56,7 +56,35 @@ export const HomeScreen: React.FC<Props> = ({ onNavigate, onOpenInstallGuide }) 
           </button>
         </div>
 
-        {/* 2. AI Teacher */}
+        {/* 2. Past 5-Yr Papers (AI) */}
+        <div
+          id="card-past-papers"
+          className="bg-white border-2 border-blue-200 rounded-2xl p-6 shadow-[0_4px_16px_rgba(37,99,235,0.06)] flex flex-col justify-between"
+        >
+          <div>
+            <div className="flex items-center justify-between mb-2.5">
+              <h3 className="text-[19px] font-bold text-[#0f172a] flex items-center gap-2">
+                <span>🎯</span>
+                <span>Past 5-Yr Papers (AI)</span>
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100 text-blue-700">
+                2020–2024
+              </span>
+            </div>
+            <p className="text-[#64748b] text-[15px] leading-normal mb-5">
+              AI suggests probable board exam questions for any topic with official CBSE marking schemes, working notes, and examiner trap warnings.
+            </p>
+          </div>
+          <button
+            id="home-btn-pyq"
+            onClick={() => onNavigate('pyq')}
+            className="w-full sm:w-auto self-start px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[15px] font-bold shadow-md shadow-blue-500/20 transition active:scale-98 cursor-pointer"
+          >
+            Explore Board Questions
+          </button>
+        </div>
+
+        {/* 3. AI Teacher */}
         <div
           id="card-ai-teacher"
           className="bg-white border border-[#cbd5e1] rounded-2xl p-6 shadow-[0_4px_16px_rgba(15,23,42,0.04)] flex flex-col justify-between"

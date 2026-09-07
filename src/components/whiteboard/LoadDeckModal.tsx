@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { SlideDeck, ReferenceDoc } from '../../types';
 import { PRESET_SLIDE_DECKS, createSlideDeckFromDoc } from '../../data/referenceDecks';
-import { X, Presentation, Upload, FileText, Check, Sparkles } from 'lucide-react';
+import { CURATED_PAST_PAPERS, createDeckFromPastPaperTopic } from '../../data/pastPapersData';
+import { X, Presentation, Upload, FileText, Check, Sparkles, Award } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -18,7 +19,7 @@ export const LoadDeckModal: React.FC<Props> = ({
   availableDocs,
   onToast = (_msg: string) => {},
 }) => {
-  const [activeTab, setActiveTab] = useState<'presets' | 'refs' | 'upload'>('presets');
+  const [activeTab, setActiveTab] = useState<'presets' | 'pyq' | 'refs' | 'upload'>('presets');
 
   if (!isOpen) return null;
 
@@ -81,6 +82,16 @@ export const LoadDeckModal: React.FC<Props> = ({
             Standard Chapter Decks ({PRESET_SLIDE_DECKS.length})
           </button>
           <button
+            onClick={() => setActiveTab('pyq')}
+            className={`pb-3 text-sm font-bold border-b-2 transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'pyq'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <span>🎯 Past 5-Yr Board Decks ({CURATED_PAST_PAPERS.length})</span>
+          </button>
+          <button
             onClick={() => setActiveTab('refs')}
             className={`pb-3 text-sm font-bold border-b-2 transition cursor-pointer ${
               activeTab === 'refs'
@@ -140,6 +151,48 @@ export const LoadDeckModal: React.FC<Props> = ({
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+
+          {activeTab === 'pyq' && (
+            <div className="space-y-3">
+              {CURATED_PAST_PAPERS.map((analysis) => {
+                const pyqDeck = createDeckFromPastPaperTopic(analysis);
+                return (
+                  <div
+                    key={pyqDeck.id}
+                    onClick={() => {
+                      onSelectDeck(pyqDeck);
+                      onToast(`Loaded Past 5-Yr Board Questions for "${analysis.topic}" onto whiteboard!`);
+                      onClose();
+                    }}
+                    className="p-4 rounded-xl border border-blue-200 bg-blue-50/30 hover:border-blue-500 hover:bg-blue-50/70 transition cursor-pointer flex items-center justify-between gap-4"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 mb-1">
+                        <span>{analysis.gradeClass}</span>
+                        <span>•</span>
+                        <span>{analysis.subject}</span>
+                        <span>•</span>
+                        <span className="px-1.5 py-0.5 rounded bg-blue-100 font-bold">
+                          {analysis.questions.length} Past Questions
+                        </span>
+                        <span>•</span>
+                        <span className="text-slate-500">{analysis.avgMarksWeightage}</span>
+                      </div>
+                      <h4 className="font-bold text-base text-slate-900 truncate">
+                        {analysis.topic} (Past 5-Yr CBSE Questions)
+                      </h4>
+                      <p className="text-xs text-slate-600 mt-0.5 truncate">
+                        {analysis.fiveYearFrequency}
+                      </p>
+                    </div>
+                    <button className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shrink-0 hover:bg-blue-700 transition shadow-xs">
+                      Load on Board
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 

@@ -4,6 +4,7 @@ export type PageId =
   | 'subjects'
   | 'lessons'
   | 'ai'
+  | 'pyq'
   | 'notes'
   | 'ppt'
   | 'quiz'
@@ -97,5 +98,35 @@ export interface WhiteboardTool {
   type: 'pen' | 'highlighter' | 'eraser' | 'line' | 'rect';
   color: string;
   size: number;
+}
+
+export interface PastPaperQuestion {
+  id: string;
+  topic: string;
+  subject: string;
+  gradeClass: string;
+  yearCitation: string; // e.g. "CBSE 2024 Delhi Set 1" or "CBSE 2023 All India"
+  marks: number;
+  questionType: 'MCQ' | 'Assertion-Reason' | 'Short-Answer' | 'Numerical' | 'Case-Study' | 'Long-Answer';
+  question: string;
+  options?: string[];
+  correctAnswerIndex?: number;
+  answerText?: string;
+  markingSchemeSteps: string[];
+  examinerTrap?: string;
+  probabilityIndex: 'High Probability' | 'Frequent Pattern' | 'Likely Trap Question';
+  workingNotes?: string;
+}
+
+export interface PastPaperTopicAnalysis {
+  topic: string;
+  subject: string;
+  gradeClass: string;
+  fiveYearFrequency: string;
+  avgMarksWeightage: string;
+  trendVerdict: string;
+  examinerPitfalls: string[];
+  questions: PastPaperQuestion[];
+  isAI?: boolean;
 }
 

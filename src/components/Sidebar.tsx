@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'subjects', label: 'My Subjects', icon: '📚' },
   { id: 'lessons', label: 'My Lessons', icon: '📖' },
   { id: 'ai', label: 'AI Teacher', icon: '🤖' },
+  { id: 'pyq', label: 'Past 5-Yr Papers (AI)', icon: '🎯' },
   { id: 'notes', label: 'Notes Maker', icon: '📝' },
   { id: 'ppt', label: 'PPT Maker', icon: '📊' },
   { id: 'quiz', label: 'Quiz Maker', icon: '❓' },

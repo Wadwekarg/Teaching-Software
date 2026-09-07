@@ -16,6 +16,7 @@ import { LessonPlannerScreen } from './components/screens/LessonPlannerScreen';
 import { VoiceTeacherScreen } from './components/screens/VoiceTeacherScreen';
 import { TalkToAIScreen } from './components/screens/TalkToAIScreen';
 import { ReferenceLibraryScreen } from './components/screens/ReferenceLibraryScreen';
+import { PastPapersScreen } from './components/screens/PastPapersScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 
 const PAGE_TITLES: Record<PageId, string> = {
@@ -24,6 +25,7 @@ const PAGE_TITLES: Record<PageId, string> = {
   subjects: 'My Subjects',
   lessons: 'My Lessons',
   ai: 'AI Classroom Teacher',
+  pyq: 'CBSE Past 5-Year Board Question Predictor & Topic Analyzer (2020–2024)',
   notes: 'Notes Maker',
   ppt: 'PowerPoint Maker (From Reference Material & Native .pptx)',
   quiz: 'Classroom Quiz Maker (From Reference Docs & Topics)',
@@ -201,6 +203,20 @@ export default function App() {
             <AITeacherScreen
               initialSubject={currentSubject}
               initialTopic={currentTopic}
+              onToast={showToast}
+              onSpeak={handleSpeak}
+            />
+          )}
+
+          {currentPage === 'pyq' && (
+            <PastPapersScreen
+              initialSubject={currentSubject}
+              initialTopic={currentTopic}
+              availableDocs={referenceDocs}
+              onTeachDeckOnWhiteboard={handleTeachDeckOnWhiteboard}
+              onSendQuestionsToQuiz={handleSendQuestionsToQuiz}
+              onNavigateToPPTMaker={handleNavigateToPPTMaker}
+              onNavigate={(p) => setCurrentPage(p)}
               onToast={showToast}
               onSpeak={handleSpeak}
             />

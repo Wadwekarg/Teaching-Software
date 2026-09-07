@@ -1,10 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { SlideDeck, ReferenceDoc } from '../../types';
+import { SlideDeck, ReferenceDoc, BoardPdfDoc } from '../../types';
 import { BoardSlideViewer } from '../whiteboard/BoardSlideViewer';
+import { BoardPdfViewer } from '../whiteboard/BoardPdfViewer';
 import { LoadDeckModal } from '../whiteboard/LoadDeckModal';
+import { LoadPdfModal } from '../whiteboard/LoadPdfModal';
 import { PRESET_SLIDE_DECKS } from '../../data/referenceDecks';
+import { PRESET_BOARD_PDF_DOCS } from '../../data/referencePdfDocs';
 import {
   Presentation,
+  FileText,
   ChevronLeft,
   ChevronRight,
   Columns,
@@ -12,13 +16,18 @@ import {
   X,
   Sparkles,
   Download,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
 } from 'lucide-react';
 
 interface Props {
   initialTopic?: string;
   activeDeck?: SlideDeck | null;
+  activePdf?: BoardPdfDoc | null;
   availableDocs?: ReferenceDoc[];
   onSelectDeck?: (deck: SlideDeck | null) => void;
+  onSelectPdf?: (pdf: BoardPdfDoc | null) => void;
   onToast?: (msg: string) => void;
 }
 
@@ -28,8 +37,10 @@ type ViewMode = 'overlay' | 'split' | 'off';
 export const WhiteboardScreen: React.FC<Props> = ({
   initialTopic,
   activeDeck = null,
+  activePdf = null,
   availableDocs = [],
   onSelectDeck,
+  onSelectPdf,
   onToast = (_msg: string) => {},
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -44,9 +55,19 @@ export const WhiteboardScreen: React.FC<Props> = ({
   // Slide Deck State
   const [deck, setDeck] = useState<SlideDeck | null>(activeDeck);
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number>(0);
-  const [viewMode, setViewMode] = useState<ViewMode>(activeDeck ? 'overlay' : 'off');
-  const [isLoadModalOpen, setIsLoadModalOpen] = useState<boolean>(false);
   const [slideAnnotations, setSlideAnnotations] = useState<Record<number, string>>({});
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState<boolean>(false);
+
+  // PDF Document State
+  const [pdfDoc, setPdfDoc] = useState<BoardPdfDoc | null>(activePdf);
+  const [currentPdfPageIndex, setCurrentPdfPageIndex] = useState<number>(0);
+  const [pdfAnnotations, setPdfAnnotations] = useState<Record<number, string>>({});
+  const [pdfZoom, setPdfZoom] = useState<number>(100);
+  const [isLoadPdfModalOpen, setIsLoadPdfModalOpen] = useState<boolean>(false);
+
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    activeDeck ? 'overlay' : activePdf ? 'overlay' : 'off'
+  );
 
   const isDrawing = useRef(false);
   const lastPos = useRef<[number, number]>([0, 0]);
@@ -54,11 +75,22 @@ export const WhiteboardScreen: React.FC<Props> = ({
   // Sync when activeDeck prop changes
   useEffect(() => {
     if (activeDeck) {
+      setPdfDoc(null);
       setDeck(activeDeck);
       setCurrentSlideIndex(0);
       setViewMode('overlay');
     }
   }, [activeDeck]);
+
+  // Sync when activePdf prop changes
+  useEffect(() => {
+    if (activePdf) {
+      setDeck(null);
+      setPdfDoc(activePdf);
+      setCurrentPdfPageIndex(0);
+      setViewMode('overlay');
+    }
+  }, [activePdf]);
 
   // Color palette items matching user design
   const colors = [
@@ -93,8 +125,8 @@ export const WhiteboardScreen: React.FC<Props> = ({
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // In overlay mode, keep transparent so slide shows through underneath
-    const isOverlayMode = deck !== null && viewMode === 'overlay';
+    // In overlay mode, keep transparent so slide or PDF shows through underneath
+    const isOverlayMode = (deck !== null || pdfDoc !== null) && viewMode === 'overlay';
     if (!isOverlayMode) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, rect.width, rect.height);
@@ -109,7 +141,7 @@ export const WhiteboardScreen: React.FC<Props> = ({
       };
       img.src = prevImage;
     }
-  }, [deck, viewMode]);
+  }, [deck, pdfDoc, viewMode]);
 
   useEffect(() => {
     resizeCanvas();
@@ -157,7 +189,7 @@ export const WhiteboardScreen: React.FC<Props> = ({
     ctx.moveTo(lx, ly);
     ctx.lineTo(x, y);
 
-    const isOverlay = deck !== null && viewMode === 'overlay';
+    const isOverlay = (deck !== null || pdfDoc !== null) && viewMode === 'overlay';
 
     if (currentTool === 'pen') {
       ctx.globalCompositeOperation = 'source-over';
@@ -171,7 +203,7 @@ export const WhiteboardScreen: React.FC<Props> = ({
       ctx.globalAlpha = 0.38;
     } else if (currentTool === 'eraser') {
       if (isOverlay) {
-        // Clear strokes transparently in overlay mode so slide is visible
+        // Clear strokes transparently in overlay mode so slide or PDF is visible
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = 38;
         ctx.strokeStyle = 'rgba(0,0,0,1)';
@@ -215,7 +247,7 @@ export const WhiteboardScreen: React.FC<Props> = ({
     const img = new Image();
     img.onload = () => {
       const rect = canvas.getBoundingClientRect();
-      const isOverlay = deck !== null && viewMode === 'overlay';
+      const isOverlay = (deck !== null || pdfDoc !== null) && viewMode === 'overlay';
       ctx.clearRect(0, 0, rect.width, rect.height);
       if (!isOverlay) {
         ctx.fillStyle = '#ffffff';
@@ -234,7 +266,7 @@ export const WhiteboardScreen: React.FC<Props> = ({
 
     saveHistoryState();
     const rect = canvas.getBoundingClientRect();
-    const isOverlay = deck !== null && viewMode === 'overlay';
+    const isOverlay = (deck !== null || pdfDoc !== null) && viewMode === 'overlay';
     ctx.clearRect(0, 0, rect.width, rect.height);
     if (!isOverlay) {
       ctx.fillStyle = '#ffffff';
@@ -247,8 +279,9 @@ export const WhiteboardScreen: React.FC<Props> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    const titleTag = pdfDoc ? pdfDoc.title : deck ? deck.title : 'Canvas';
     const link = document.createElement('a');
-    link.download = `SmartTeaching_Board_${deck ? deck.title.replace(/\s+/g, '_') : 'Canvas'}_${Date.now()}.png`;
+    link.download = `SmartTeaching_Board_${titleTag.replace(/\s+/g, '_')}_${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
     onToast('Whiteboard PNG saved to downloads!');
@@ -289,6 +322,8 @@ export const WhiteboardScreen: React.FC<Props> = ({
   };
 
   const handleSelectDeckFromModal = (selected: SlideDeck) => {
+    setPdfDoc(null);
+    if (onSelectPdf) onSelectPdf(null);
     setDeck(selected);
     setCurrentSlideIndex(0);
     setViewMode('overlay');
@@ -302,6 +337,59 @@ export const WhiteboardScreen: React.FC<Props> = ({
     setViewMode('off');
     if (onSelectDeck) onSelectDeck(null);
     onToast('Closed presentation. Full whiteboard active.');
+    setTimeout(() => resizeCanvas(), 50);
+  };
+
+  // Switch PDF page while preserving teacher's handwritten annotations per page
+  const changePdfPage = (newIndex: number) => {
+    if (!pdfDoc || newIndex < 0 || newIndex >= pdfDoc.pages.length) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (canvas && ctx) {
+      // Save current page annotation
+      const currentURL = canvas.toDataURL();
+      setPdfAnnotations((prev) => ({ ...prev, [currentPdfPageIndex]: currentURL }));
+
+      // Prepare canvas for new page
+      const rect = canvas.getBoundingClientRect();
+      const isOverlay = viewMode === 'overlay';
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      if (!isOverlay) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, rect.width, rect.height);
+      }
+
+      // Restore target page annotation if it exists
+      const targetURL = pdfAnnotations[newIndex];
+      if (targetURL) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, rect.width, rect.height);
+        };
+        img.src = targetURL;
+      }
+    }
+
+    setCurrentPdfPageIndex(newIndex);
+  };
+
+  const handleSelectPdfFromModal = (selected: BoardPdfDoc) => {
+    setDeck(null);
+    if (onSelectDeck) onSelectDeck(null);
+    setPdfDoc(selected);
+    setCurrentPdfPageIndex(0);
+    setViewMode('overlay');
+    setPdfAnnotations({});
+    setHistory([]);
+    if (onSelectPdf) onSelectPdf(selected);
+  };
+
+  const closePdfDocument = () => {
+    setPdfDoc(null);
+    setViewMode('off');
+    if (onSelectPdf) onSelectPdf(null);
+    onToast('Closed PDF document. Full whiteboard active.');
     setTimeout(() => resizeCanvas(), 50);
   };
 
@@ -404,9 +492,135 @@ export const WhiteboardScreen: React.FC<Props> = ({
   };
 
   const activeSlide = deck ? deck.slides[currentSlideIndex] : null;
+  const activePdfPage = pdfDoc && pdfDoc.pages[currentPdfPageIndex] ? pdfDoc.pages[currentPdfPageIndex] : null;
 
   return (
     <div id="screen-whiteboard" className="h-full flex flex-col space-y-3 select-none">
+      {/* PDF Document Presentation Control Ribbon (Visible when a PDF is loaded) */}
+      {pdfDoc && activePdfPage && (
+        <div className="bg-slate-900 text-white border border-emerald-500/30 rounded-2xl px-4 py-2.5 shadow-md flex items-center justify-between flex-wrap gap-3 animate-in fade-in duration-150">
+          {/* PDF Details */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 rounded-xl bg-emerald-600 text-white font-bold text-xs shrink-0 flex items-center gap-1.5 shadow-xs">
+              <FileText className="w-4 h-4" />
+              <span>PDF On Board</span>
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm text-white truncate max-w-xs md:max-w-md">
+                {pdfDoc.title}
+              </h3>
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span>{pdfDoc.gradeClass}</span>
+                <span>•</span>
+                <span className="text-emerald-300 font-semibold">{pdfDoc.subject}</span>
+                <span>•</span>
+                <span className="text-slate-400">{pdfDoc.fileSize || 'Reference Material'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Page Navigation Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => changePdfPage(currentPdfPageIndex - 1)}
+              disabled={currentPdfPageIndex === 0}
+              className="h-9 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
+              title="Previous Page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Prev</span>
+            </button>
+
+            <span className="px-3 py-1.5 rounded-lg bg-slate-800 text-emerald-300 text-xs font-mono font-bold border border-emerald-500/20">
+              Page {currentPdfPageIndex + 1} of {pdfDoc.pages.length}
+            </span>
+
+            <button
+              onClick={() => changePdfPage(currentPdfPageIndex + 1)}
+              disabled={currentPdfPageIndex === pdfDoc.pages.length - 1}
+              className="h-9 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
+              title="Next Page"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Zoom & View Modes & Close */}
+          <div className="flex items-center gap-2">
+            {/* Zoom Controls */}
+            <div className="hidden sm:flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
+              <button
+                onClick={() => setPdfZoom((prev) => Math.max(prev - 15, 70))}
+                className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-700 transition cursor-pointer"
+                title="Zoom Out"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="text-xs font-mono font-bold text-slate-300 px-1">
+                {pdfZoom}%
+              </span>
+              <button
+                onClick={() => setPdfZoom((prev) => Math.min(prev + 15, 175))}
+                className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-700 transition cursor-pointer"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setPdfZoom(100)}
+                className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-700 transition cursor-pointer"
+                title="Reset Zoom to 100%"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* View Mode Toggle */}
+            <div className="bg-slate-800 p-1 rounded-xl flex items-center gap-1 border border-slate-700">
+              <button
+                onClick={() => {
+                  setViewMode('overlay');
+                  setTimeout(() => resizeCanvas(), 50);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'overlay'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Annotate directly over the PDF document page"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Annotate Over PDF</span>
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode('split');
+                  setTimeout(() => resizeCanvas(), 50);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                  viewMode === 'split'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Split Screen: PDF document on left, whiteboard canvas on right"
+              >
+                <Columns className="w-3.5 h-3.5" />
+                <span>Split Screen</span>
+              </button>
+            </div>
+
+            <button
+              onClick={closePdfDocument}
+              className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition cursor-pointer"
+              title="Close PDF Document"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* PPT Slide Presentation Control Ribbon (Visible when a deck is loaded) */}
       {deck && activeSlide && (
         <div className="bg-[#0f172a] text-white border border-slate-700 rounded-2xl px-4 py-2.5 shadow-md flex items-center justify-between flex-wrap gap-3 animate-in fade-in duration-150">
@@ -593,8 +807,17 @@ export const WhiteboardScreen: React.FC<Props> = ({
           ))}
         </div>
 
-        {/* Commerce Templates & PPT on Whiteboard */}
+        {/* Commerce Templates, PDF & PPT on Whiteboard */}
         <div className="flex items-center gap-2 pl-3 border-l border-slate-300">
+          <button
+            onClick={() => setIsLoadPdfModalOpen(true)}
+            className="min-h-[44px] px-3.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-[13px] font-extrabold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
+            title="Bring Reference PDF document directly on whiteboard"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>Load PDF on Board</span>
+          </button>
+
           <button
             onClick={() => setIsLoadModalOpen(true)}
             className="min-h-[44px] px-3.5 rounded-xl border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-900 text-[13px] font-extrabold flex items-center gap-1.5 cursor-pointer shadow-xs transition"
@@ -651,43 +874,108 @@ export const WhiteboardScreen: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Drawing Canvas / PPT Presentation Stage */}
+      {/* Main Drawing Canvas / PPT / PDF Presentation Stage */}
       <div
         ref={containerRef}
         id="whiteboard-canvas-container"
         className="flex-1 min-h-[540px] bg-white border-2 border-[#94a3b8] rounded-2xl shadow-lg relative overflow-hidden flex flex-col md:flex-row"
       >
-        {/* Split Screen Mode: Left half shows slide, right half shows whiteboard */}
-        {deck && activeSlide && viewMode === 'split' ? (
-          <>
-            <div className="w-full md:w-1/2 h-full border-b md:border-b-0 md:border-r border-slate-300 overflow-hidden bg-slate-50">
-              <BoardSlideViewer
-                slide={activeSlide}
-                slideNumber={currentSlideIndex + 1}
-                totalSlides={deck.slides.length}
-              />
-            </div>
-            <div className="w-full md:w-1/2 h-full relative bg-white">
+        {/* PDF Presentation Mode */}
+        {pdfDoc && activePdfPage ? (
+          viewMode === 'split' ? (
+            <>
+              <div className="w-full md:w-1/2 h-full border-b md:border-b-0 md:border-r border-slate-300 overflow-hidden bg-slate-100">
+                <BoardPdfViewer
+                  page={activePdfPage}
+                  pageNumber={currentPdfPageIndex + 1}
+                  totalPages={pdfDoc.pages.length}
+                  documentTitle={pdfDoc.title}
+                  zoomLevel={pdfZoom}
+                  onZoomIn={() => setPdfZoom((prev) => Math.min(prev + 15, 175))}
+                  onZoomOut={() => setPdfZoom((prev) => Math.max(prev - 15, 70))}
+                  onResetZoom={() => setPdfZoom(100)}
+                />
+              </div>
+              <div className="w-full md:w-1/2 h-full relative bg-white">
+                <canvas
+                  ref={canvasRef}
+                  id="canvas"
+                  className="drawing-canvas w-full h-full block bg-white cursor-crosshair"
+                  onPointerDown={startDrawing}
+                  onPointerMove={draw}
+                  onPointerUp={stopDrawing}
+                  onPointerLeave={stopDrawing}
+                  onPointerCancel={stopDrawing}
+                />
+                <div className="absolute top-3 left-3 pointer-events-none px-3 py-1 rounded-full bg-slate-900/70 text-white text-[11px] font-medium backdrop-blur-xs">
+                  Whiteboard Working Space
+                </div>
+              </div>
+            </>
+          ) : (
+            /* PDF Overlay Mode */
+            <div className="w-full h-full relative">
+              <div className="absolute inset-0 z-0 overflow-hidden">
+                <BoardPdfViewer
+                  page={activePdfPage}
+                  pageNumber={currentPdfPageIndex + 1}
+                  totalPages={pdfDoc.pages.length}
+                  documentTitle={pdfDoc.title}
+                  isOverlay
+                  zoomLevel={pdfZoom}
+                  onZoomIn={() => setPdfZoom((prev) => Math.min(prev + 15, 175))}
+                  onZoomOut={() => setPdfZoom((prev) => Math.max(prev - 15, 70))}
+                  onResetZoom={() => setPdfZoom(100)}
+                />
+              </div>
+
               <canvas
                 ref={canvasRef}
                 id="canvas"
-                className="drawing-canvas w-full h-full block bg-white cursor-crosshair"
+                className="drawing-canvas w-full h-full block cursor-crosshair absolute inset-0 z-10 bg-transparent"
                 onPointerDown={startDrawing}
                 onPointerMove={draw}
                 onPointerUp={stopDrawing}
                 onPointerLeave={stopDrawing}
                 onPointerCancel={stopDrawing}
               />
-              <div className="absolute top-3 left-3 pointer-events-none px-3 py-1 rounded-full bg-slate-900/70 text-white text-[11px] font-medium backdrop-blur-xs">
-                Whiteboard Working Space
+
+              <div className="absolute top-3 right-4 pointer-events-none z-20 px-3.5 py-1.5 rounded-full bg-emerald-700/90 text-white text-[12px] font-bold shadow-md backdrop-blur-xs flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Active Stylus Markup Over PDF Page</span>
               </div>
             </div>
-          </>
-        ) : (
-          /* Overlay Mode or Standard Board Mode */
-          <div className="w-full h-full relative">
-            {/* Slide Backdrop in Overlay Mode */}
-            {deck && activeSlide && viewMode === 'overlay' && (
+          )
+        ) : deck && activeSlide ? (
+          /* PPT Deck Presentation Mode */
+          viewMode === 'split' ? (
+            <>
+              <div className="w-full md:w-1/2 h-full border-b md:border-b-0 md:border-r border-slate-300 overflow-hidden bg-slate-50">
+                <BoardSlideViewer
+                  slide={activeSlide}
+                  slideNumber={currentSlideIndex + 1}
+                  totalSlides={deck.slides.length}
+                />
+              </div>
+              <div className="w-full md:w-1/2 h-full relative bg-white">
+                <canvas
+                  ref={canvasRef}
+                  id="canvas"
+                  className="drawing-canvas w-full h-full block bg-white cursor-crosshair"
+                  onPointerDown={startDrawing}
+                  onPointerMove={draw}
+                  onPointerUp={stopDrawing}
+                  onPointerLeave={stopDrawing}
+                  onPointerCancel={stopDrawing}
+                />
+                <div className="absolute top-3 left-3 pointer-events-none px-3 py-1 rounded-full bg-slate-900/70 text-white text-[11px] font-medium backdrop-blur-xs">
+                  Whiteboard Working Space
+                </div>
+              </div>
+            </>
+          ) : (
+            /* PPT Overlay Mode */
+            <div className="w-full h-full relative">
               <div className="absolute inset-0 z-0 overflow-hidden">
                 <BoardSlideViewer
                   slide={activeSlide}
@@ -696,31 +984,41 @@ export const WhiteboardScreen: React.FC<Props> = ({
                   isOverlay
                 />
               </div>
-            )}
 
-            {/* Drawing Canvas */}
+              <canvas
+                ref={canvasRef}
+                id="canvas"
+                className={`drawing-canvas w-full h-full block cursor-crosshair ${
+                  viewMode === 'overlay'
+                    ? 'absolute inset-0 z-10 bg-transparent'
+                    : 'bg-white'
+                }`}
+                onPointerDown={startDrawing}
+                onPointerMove={draw}
+                onPointerUp={stopDrawing}
+                onPointerLeave={stopDrawing}
+                onPointerCancel={stopDrawing}
+              />
+
+              <div className="absolute top-3 right-4 pointer-events-none z-20 px-3.5 py-1.5 rounded-full bg-blue-600/90 text-white text-[12px] font-bold shadow-md backdrop-blur-xs flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Active Stylus Markup Over Slide</span>
+              </div>
+            </div>
+          )
+        ) : (
+          /* Standard Full Blank Whiteboard Canvas */
+          <div className="w-full h-full relative">
             <canvas
               ref={canvasRef}
               id="canvas"
-              className={`drawing-canvas w-full h-full block cursor-crosshair ${
-                deck && viewMode === 'overlay'
-                  ? 'absolute inset-0 z-10 bg-transparent'
-                  : 'bg-white'
-              }`}
+              className="drawing-canvas w-full h-full block bg-white cursor-crosshair"
               onPointerDown={startDrawing}
               onPointerMove={draw}
               onPointerUp={stopDrawing}
               onPointerLeave={stopDrawing}
               onPointerCancel={stopDrawing}
             />
-
-            {/* In overlay mode, visual badge that stylus can write directly over slide */}
-            {deck && viewMode === 'overlay' && (
-              <div className="absolute top-3 right-4 pointer-events-none z-20 px-3.5 py-1.5 rounded-full bg-blue-600/90 text-white text-[12px] font-bold shadow-md backdrop-blur-xs flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Active Stylus Markup Over Slide</span>
-              </div>
-            )}
           </div>
         )}
 
@@ -735,6 +1033,15 @@ export const WhiteboardScreen: React.FC<Props> = ({
         isOpen={isLoadModalOpen}
         onClose={() => setIsLoadModalOpen(false)}
         onSelectDeck={handleSelectDeckFromModal}
+        availableDocs={availableDocs}
+        onToast={onToast}
+      />
+
+      {/* Modal to Load PDF onto Board */}
+      <LoadPdfModal
+        isOpen={isLoadPdfModalOpen}
+        onClose={() => setIsLoadPdfModalOpen(false)}
+        onSelectPdf={handleSelectPdfFromModal}
         availableDocs={availableDocs}
         onToast={onToast}
       />

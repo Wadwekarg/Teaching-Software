@@ -94,6 +94,42 @@ export interface SlideDeck {
   attachedQuestions?: any[];
 }
 
+export interface PdfPageSection {
+  heading?: string;
+  paragraphs?: string[];
+  bulletPoints?: string[];
+  tableHeaders?: string[];
+  tableRows?: string[][];
+  calloutNote?: {
+    title: string;
+    text: string;
+    tone?: 'blue' | 'amber' | 'emerald' | 'red';
+  };
+}
+
+export interface PdfPage {
+  pageNumber: number;
+  title: string;
+  subtitle?: string;
+  badge?: string;
+  contentSections: PdfPageSection[];
+  pageFooter?: string;
+}
+
+export interface BoardPdfDoc {
+  id: string;
+  title: string;
+  fileName: string;
+  subject: string;
+  gradeClass: string;
+  category: string;
+  totalPages: number;
+  pages: PdfPage[];
+  sourceDocId?: string;
+  fileSize?: string;
+  uploadedAt?: string;
+}
+
 export interface WhiteboardTool {
   type: 'pen' | 'highlighter' | 'eraser' | 'line' | 'rect';
   color: string;

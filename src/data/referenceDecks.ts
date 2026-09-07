@@ -297,9 +297,9 @@ export const PRESET_SLIDE_DECKS: SlideDeck[] = [
 ];
 
 /**
- * Creates an interactive SlideDeck from an uploaded ReferenceDoc
+ * Creates an interactive SlideDeck from an uploaded ReferenceDoc with curriculum questions
  */
-export function createSlideDeckFromDoc(doc: ReferenceDoc): SlideDeck {
+export function createSlideDeckFromDoc(doc: ReferenceDoc, options?: { questionCount?: number }): SlideDeck {
   const isAccountancy = doc.name.toLowerCase().includes('account') || doc.contentSummary.toLowerCase().includes('partnership') || doc.contentSummary.toLowerCase().includes('cash flow');
   const isEconomics = doc.name.toLowerCase().includes('econ') || doc.contentSummary.toLowerCase().includes('gdp') || doc.contentSummary.toLowerCase().includes('income') || doc.contentSummary.toLowerCase().includes('rbi');
   const subject = isAccountancy ? 'Accountancy' : isEconomics ? 'Economics' : 'Business Studies';
@@ -309,19 +309,58 @@ export function createSlideDeckFromDoc(doc: ReferenceDoc): SlideDeck {
     .replace(/CBSE_Class12_/i, '')
     .replace(/_/g, ' ');
 
+  const qCount = options?.questionCount ?? 3;
+  const generatedQs = generateQuestionsFromDoc(doc, Math.max(qCount, 3));
+
+  // Build question slides from the generated curriculum questions
+  const questionSlides: SlideItem[] = generatedQs.slice(0, qCount).map((q, idx) => {
+    const isAssertion = q.type === 'Assertion-Reason';
+    const isShort = q.type === '3-Mark Short' || q.type === '6-Mark Case Study';
+
+    const defaultOptions = [
+      'A) Full statutory compliance with documented working notes',
+      'B) Omission of intermediate algebraic or ledger adjustments',
+      'C) Unilateral transfer recognition without factor service',
+      'D) Arbitrary estimation without comparative period disclosures',
+    ];
+
+    return {
+      id: `gen-q-${idx + 1}`,
+      title: `Checkpoint ${idx + 1}: ${q.type}`,
+      subtitle: `Classroom Diagnostic • ${q.marks} Mark${q.marks > 1 ? 's' : ''} Question from Reference Material`,
+      type: 'quiz',
+      quizQuestion: {
+        question: q.question,
+        options: q.options && q.options.length > 0 ? q.options : defaultOptions,
+        answerIndex: typeof q.answer === 'number' ? q.answer : 0,
+        explanation: q.explanation,
+        questionType: q.type as any,
+        marks: q.marks,
+        workingNotes: typeof q.answer === 'string' ? q.answer : undefined,
+      },
+      calloutBox: {
+        title: 'CBSE Marking Rubric',
+        text: `Value points for this ${q.type}: accurate identification, statutory alignment, and formal ledger or working note disclosure.`,
+        tone: idx % 2 === 0 ? 'blue' : 'amber',
+      },
+    };
+  });
+
   return {
     id: `deck-${Date.now()}`,
     title: cleanTitle,
     subject: subject,
     gradeClass: 'Class 12',
     sourceDocName: doc.name,
+    questionsCount: questionSlides.length,
+    attachedQuestions: generatedQs,
     slides: [
       {
         id: 'gen-s1',
         title: cleanTitle,
         subtitle: `Class 12 ${subject} • Generated from Uploaded Reference Material`,
         type: 'cover',
-        footer: `Source: ${doc.name} • Smart Teaching Whiteboard Deck`,
+        footer: `Source: ${doc.name} • Smart Teaching Whiteboard Deck (${questionSlides.length} Questions Included)`,
       },
       {
         id: 'gen-s2',
@@ -332,7 +371,7 @@ export function createSlideDeckFromDoc(doc: ReferenceDoc): SlideDeck {
           `1. Core Content: ${doc.contentSummary.slice(0, 110)}...`,
           `2. Examination Alignment: Senior Secondary CBSE marking scheme and standard answer rubric`,
           '3. Theory to Practical Integration: Formula derivations, ledger entries, and managerial applications',
-          '4. Timed Classroom Assessment: Checkpoint diagnostics and common board pitfalls',
+          `4. Interactive Checkpoints: ${questionSlides.length} targeted examination dilemmas for whiteboard testing`,
         ],
         calloutBox: {
           title: 'Reference Material Scope',
@@ -375,33 +414,204 @@ export function createSlideDeckFromDoc(doc: ReferenceDoc): SlideDeck {
           tone: 'emerald',
         },
       },
+      // Injected questions right into the presentation deck
+      ...questionSlides,
       {
-        id: 'gen-s5',
-        title: 'Classroom Checkpoint: 2-Minute Diagnostic',
-        subtitle: 'Test comprehension of key principles from this reference document',
-        type: 'quiz',
-        quizQuestion: {
-          question: `In standard examination problems concerning ${cleanTitle}, what is the mandatory requirement for full marks?`,
-          options: [
-            'A) Providing complete formal working notes with standard format headings',
-            'B) Omitting comparative figures and narrations to save examination time',
-            'C) Guessing final figures without intermediate algebraic or journal steps',
-            'D) Using pencil for final ledger figures contrary to CBSE instructions',
-          ],
-          answerIndex: 0,
-          explanation: 'Clear working notes, standard account formats, and precise narrations are strictly required to earn full 6-mark or 8-mark credit in board exams.',
-        },
-      },
-      {
-        id: 'gen-s6',
+        id: 'gen-s-summary',
         title: 'Lesson Summary & Student Action Items',
         subtitle: 'Homework and revision tasks mapped to reference content',
         type: 'summary',
         bulletPoints: [
           `Review all key formulas and provisions highlighted from ${doc.name}.`,
           'Practice drawing the standard ledger/analytical formats under timed 8-minute conditions.',
-          'Complete the attached checkpoint exercise questions in your classroom registers.',
+          `Complete all ${questionSlides.length} checkpoint questions in your classroom registers with full working notes.`,
           'Next session: Advanced numerical problems and past 5-year CBSE board paper questions.',
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * Creates an interactive SlideDeck from a custom topic with multiple syllabus questions
+ */
+export function createCustomTopicDeck(params: {
+  topic: string;
+  gradeClass: string;
+  subject: string;
+  questionCount?: number;
+}): SlideDeck {
+  const { topic, gradeClass, subject } = params;
+  const qCount = params.questionCount ?? 3;
+
+  const topicLower = topic.toLowerCase();
+  const matchedCategory =
+    topicLower.includes('partner') || topicLower.includes('share') || topicLower.includes('cash') || topicLower.includes('account') || subject.toLowerCase().includes('account')
+      ? 'accountancy'
+      : topicLower.includes('income') || topicLower.includes('demand') || topicLower.includes('multiplier') || topicLower.includes('gdp') || subject.toLowerCase().includes('econ')
+      ? 'economics'
+      : 'business';
+
+  const questionBank: {
+    question: string;
+    options: string[];
+    answer: number;
+    explanation: string;
+    type: 'MCQ' | 'Assertion-Reason' | 'Numerical' | 'Case-Study';
+    marks: number;
+  }[] = [
+    {
+      question: `In standard board examination problems regarding "${topic}", which statutory principle must be adhered to for full marks?`,
+      options: [
+        'A) Strict adherence to matching principles and formal working notes',
+        'B) Subjective discretion without recorded computations',
+        'C) Omission of comparative period figures from final balance sheets',
+        'D) Recognition of capital gains directly into revenue reserves',
+      ],
+      answer: 0,
+      explanation: `In Class 12 ${subject} board examinations, full credit is awarded only when statutory formats, recognized formulas, and clean working notes are clearly documented.`,
+      type: 'MCQ',
+      marks: 1,
+    },
+    {
+      question: `Assertion (A): Adjustments in "${topic}" require strict chronological calculation of intermediate values.\nReason (R): Omission of initial adjustments distorts downstream capital equilibrium and financial ratios.`,
+      options: [
+        'A) Both (A) and (R) are true and (R) is the correct explanation of (A)',
+        'B) Both (A) and (R) are true but (R) is NOT the correct explanation of (A)',
+        'C) (A) is true, but (R) is false',
+        'D) (A) is false, but (R) is true',
+      ],
+      answer: 0,
+      explanation: 'Sequential calculation prevents cascade errors in balance sheet reconciliation and working capital aggregates.',
+      type: 'Assertion-Reason',
+      marks: 1,
+    },
+    {
+      question: `Working Note Dilemma: An enterprise transaction concerning "${topic}" is recorded without factoring in statutory limits. How should the student adjust this in the examination ledger?`,
+      options: [
+        'A) Reverse the excess portion through Revaluation / Profit & Loss Appropriation',
+        'B) Ignore the transaction because total balances already match',
+        'C) Add the entire unadjusted amount to Operating Expenses',
+        'D) Transfer the difference directly to Suspense Account',
+      ],
+      answer: 0,
+      explanation: 'Statutory non-compliance requires explicit reversal through the designated appropriation account with supporting working notes.',
+      type: 'Numerical',
+      marks: 3,
+    },
+    {
+      question: `Case Study Analysis: A firm encountering rapid changes in "${topic}" must present a revised financial position. What is the primary disclosure requirement?`,
+      options: [
+        'A) Full notes to accounts specifying accounting policies and assumptions',
+        'B) Oral disclosure during board meetings without paper trail',
+        'C) Confidential management reserves hidden from public reporting',
+        'D) Rounding off all numbers to the nearest crore without decimals',
+      ],
+      answer: 0,
+      explanation: 'Mandatory accounting standards require comprehensive disclosure of accounting policies and significant assumptions in Notes to Accounts.',
+      type: 'Case-Study',
+      marks: 4,
+    },
+  ];
+
+  const questionSlides: SlideItem[] = questionBank.slice(0, qCount).map((q, idx) => ({
+    id: `custom-q-${idx + 1}`,
+    title: `Classroom Checkpoint ${idx + 1}: ${q.type}`,
+    subtitle: `${gradeClass} • ${subject} Checkpoint • ${q.marks} Mark${q.marks > 1 ? 's' : ''}`,
+    type: 'quiz',
+    quizQuestion: {
+      question: q.question,
+      options: q.options,
+      answerIndex: q.answer,
+      explanation: q.explanation,
+      questionType: q.type,
+      marks: q.marks,
+    },
+    calloutBox: {
+      title: 'Stylus Teaching Prompt',
+      text: 'Ask a student to step up to the touchscreen panel, select their choice, and use the stylus to underline the determining keyword.',
+      tone: idx % 2 === 0 ? 'blue' : 'emerald',
+    },
+  }));
+
+  return {
+    id: `custom-deck-${Date.now()}`,
+    title: topic || 'Classroom Presentation Deck',
+    gradeClass: gradeClass,
+    subject: subject,
+    questionsCount: questionSlides.length,
+    slides: [
+      {
+        id: 's1',
+        type: 'cover',
+        title: topic,
+        subtitle: `${gradeClass} • ${subject} Comprehensive Interactive Deck`,
+        footer: `Smart Teaching Studio • Interactive Whiteboard Edition (${questionSlides.length} Questions Included)`,
+      },
+      {
+        id: 's2',
+        type: 'roadmap',
+        title: 'Learning Objectives & Syllabus Roadmap',
+        subtitle: 'Targeted milestones for board examinations',
+        bulletPoints: [
+          `1. Master statutory principles and regulatory guidelines governing ${topic}`,
+          '2. Formulate correct ledger adjustments, mathematical models, and journal entries',
+          '3. Analyze frequent examiner traps and high-impact calculation oversights',
+          `4. Solve ${questionSlides.length} authentic classroom checkpoint questions on the interactive panel`,
+        ],
+        calloutBox: {
+          title: 'Period Focus',
+          text: `Designed for 45-60 minute classroom instruction with live stylus annotations and student dilemmas.`,
+          tone: 'blue',
+        },
+      },
+      {
+        id: 's3',
+        type: 'concept',
+        title: 'Core Principles, Formulas & Board Traps',
+        subtitle: 'Essential rules students must memorize',
+        bulletPoints: [
+          `Fundamental Rule: Every adjustment in ${topic} has dual impact on financial/economic statements.`,
+          'Verification of Opening Balances: Always confirm whether given figures are gross or net of reserves.',
+          'Presentation Rigor: Show formulas with appropriate measurement units (₹, %, or units of output).',
+          'Avoid Critical Errors: Scrutinize question dates, uncalled amounts, and non-operating revenue items.',
+        ],
+        calloutBox: {
+          title: 'Examiner Warning',
+          text: 'Never jump straight to final answers without showing intermediate algebraic steps or ledger working notes!',
+          tone: 'red',
+        },
+      },
+      {
+        id: 's4',
+        type: 'table',
+        title: 'Practical Ledger Illustration & Step-by-Step Table',
+        subtitle: 'Standard presentation format for board assessment',
+        tableHeaders: ['Step #', 'Particulars / Transaction', 'Working Note Reference', 'Amount (₹)'],
+        tableRows: [
+          ['1', 'Base Balance Extraction', 'W.N. 1 (Opening Balance)', '₹ 4,50,000'],
+          ['2', 'Statutory Adjustment Applied', 'W.N. 2 (Depreciation / Revaluation)', '₹ 80,000'],
+          ['3', 'Non-Operating / Extraordinary Item', 'W.N. 3 (Realisation / Premium)', '(₹ 25,000)'],
+          ['4', 'Final Reconciled Board Figure', 'Balanced Ledger Equilibrium', '₹ 5,05,000'],
+        ],
+        calloutBox: {
+          title: 'Whiteboard Activity',
+          text: 'Use the Whiteboard Split Screen to solve live practice variants on the right side while keeping this template visible on the left.',
+          tone: 'emerald',
+        },
+      },
+      // Injected Question Slides
+      ...questionSlides,
+      {
+        id: 's-summary',
+        type: 'summary',
+        title: 'Period Summary & Homework Allocation',
+        subtitle: 'Key takeaways and practice assignment',
+        bulletPoints: [
+          `Review all key principles and rules discussed for ${topic}.`,
+          `Ensure working notes for all ${questionSlides.length} checkpoint questions are entered in classroom notebooks.`,
+          'Complete assigned textbook problems from NCERT and reference books.',
+          'Next Period: Advanced case studies and multi-period comparative analysis.',
         ],
       },
     ],

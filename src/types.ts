@@ -73,6 +73,11 @@ export interface SlideItem {
     options: string[];
     answerIndex: number;
     explanation: string;
+    questionType?: 'MCQ' | 'Assertion-Reason' | 'Numerical' | 'Case-Study';
+    assertionText?: string;
+    reasonText?: string;
+    marks?: number;
+    workingNotes?: string;
   };
   footer?: string;
 }
@@ -84,6 +89,8 @@ export interface SlideDeck {
   gradeClass: string;
   sourceDocName?: string;
   slides: SlideItem[];
+  questionsCount?: number;
+  attachedQuestions?: any[];
 }
 
 export interface WhiteboardTool {

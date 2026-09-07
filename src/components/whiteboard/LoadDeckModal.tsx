@@ -36,9 +36,9 @@ export const LoadDeckModal: React.FC<Props> = ({
       uploadedAt: new Date().toLocaleTimeString(),
     };
 
-    const newDeck = createSlideDeckFromDoc(fakeDoc);
+    const newDeck = createSlideDeckFromDoc(fakeDoc, { questionCount: 3 });
     onSelectDeck(newDeck);
-    onToast(`Loaded slides from "${file.name}" onto Whiteboard!`);
+    onToast(`Loaded presentation with ${newDeck.slides.filter(s => s.type === 'quiz').length} questions from "${file.name}" onto Whiteboard!`);
     onClose();
   };
 
@@ -123,6 +123,10 @@ export const LoadDeckModal: React.FC<Props> = ({
                       <span>{deck.subject}</span>
                       <span>•</span>
                       <span>{deck.slides.length} Slides</span>
+                      <span>•</span>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">
+                        {deck.questionsCount || deck.slides.filter((s) => s.type === 'quiz').length} Questions
+                      </span>
                     </div>
                     <h4 className="font-bold text-base text-slate-900 truncate">
                       {deck.title}
@@ -150,9 +154,9 @@ export const LoadDeckModal: React.FC<Props> = ({
                   <div
                     key={doc.id}
                     onClick={() => {
-                      const deck = createSlideDeckFromDoc(doc);
+                      const deck = createSlideDeckFromDoc(doc, { questionCount: 3 });
                       onSelectDeck(deck);
-                      onToast(`Created and loaded slides from "${doc.name}"!`);
+                      onToast(`Created and loaded presentation with 3 questions from "${doc.name}"!`);
                       onClose();
                     }}
                     className="p-4 rounded-xl border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 transition cursor-pointer flex items-center justify-between gap-4"
@@ -164,6 +168,10 @@ export const LoadDeckModal: React.FC<Props> = ({
                         <span>{doc.size}</span>
                         <span>•</span>
                         <span>{doc.category}</span>
+                        <span>•</span>
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
+                          Includes 3 Checkpoint Questions
+                        </span>
                       </div>
                       <h4 className="font-bold text-base text-slate-900 truncate">
                         {doc.name}

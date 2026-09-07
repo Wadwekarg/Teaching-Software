@@ -573,23 +573,46 @@ export async function exportCustomDeckPPTX(deck: SlideDeck): Promise<string> {
         const isAnswer = oIdx === s.quizQuestion?.answerIndex;
         slide.addShape(pptx.ShapeType.roundRect, {
           x: 0.8,
-          y: 3.2 + oIdx * 0.7,
+          y: 3.2 + oIdx * 0.65,
           w: 11.7,
-          h: 0.55,
+          h: 0.52,
           fill: { color: isAnswer ? 'EFF6FF' : 'FFFFFF' },
           line: { color: isAnswer ? '2563EB' : 'CBD5E1', width: 1.5 },
         });
         slide.addText(opt, {
           x: 1.1,
-          y: 3.2 + oIdx * 0.7,
+          y: 3.2 + oIdx * 0.65,
           w: 11.2,
-          h: 0.55,
-          fontSize: 13,
+          h: 0.52,
+          fontSize: 12,
           color: isAnswer ? '1E40AF' : '334155',
           bold: isAnswer,
           fontFace: 'Segoe UI',
         });
       });
+
+      if (s.quizQuestion.explanation) {
+        const explY = 3.2 + s.quizQuestion.options.length * 0.65 + 0.1;
+        if (explY < 6.4) {
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x: 0.8,
+            y: explY,
+            w: 11.7,
+            h: 0.7,
+            fill: { color: 'F0FDF4' },
+            line: { color: '86EFAC', width: 1 },
+          });
+          slide.addText(`CBSE Marking Rationale: ${s.quizQuestion.explanation}`, {
+            x: 1.1,
+            y: explY,
+            w: 11.2,
+            h: 0.7,
+            fontSize: 11,
+            color: '14532D',
+            fontFace: 'Segoe UI',
+          });
+        }
+      }
     }
   });
 

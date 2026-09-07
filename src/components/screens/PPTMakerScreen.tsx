@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ReferenceDoc, SlideDeck } from '../../types';
-import { DEFAULT_REFERENCE_DOCS, createSlideDeckFromDoc } from '../../data/referenceDecks';
+import { DEFAULT_REFERENCE_DOCS, createSlideDeckFromDoc, createCustomTopicDeck } from '../../data/referenceDecks';
 import { generateNativePPTX, exportCustomDeckPPTX } from '../../utils/pptxExport';
 import {
   Download,
@@ -12,6 +12,8 @@ import {
   Upload,
   Layers,
   ArrowRight,
+  HelpCircle,
+  Check,
 } from 'lucide-react';
 
 interface Props {
@@ -42,9 +44,11 @@ export const PPTMakerScreen: React.FC<Props> = ({
   const [selectedSubject, setSelectedSubject] = useState<string>(initialSubject);
   const [topic, setTopic] = useState<string>(initialTopic);
   const [slidesCount, setSlidesCount] = useState<number>(6);
+  const [includeQuestions, setIncludeQuestions] = useState<boolean>(true);
+  const [questionCount, setQuestionCount] = useState<number>(3);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [statusLog, setStatusLog] = useState<string>(
-    `Select any uploaded reference document above to automatically synthesize a 16:9 presentation deck, or choose "Custom Topic" to craft a presentation from scratch.\n\nAll presentations can be downloaded as native .pptx files or launched directly onto the Whiteboard canvas for live stylus markup.`
+    `Select any uploaded reference document above to automatically synthesize a 16:9 presentation deck with interactive questions, or choose "Custom Topic" to craft a presentation from scratch.\n\nAll presentations can be downloaded as native .pptx files or launched directly onto the Whiteboard canvas for live stylus markup and student polling.`
   );
 
   const activeRefDoc = availableDocs.find((d) => d.id === selectedDocId) || null;
@@ -70,42 +74,52 @@ export const PPTMakerScreen: React.FC<Props> = ({
     setIsGenerating(true);
 
     try {
+      const qNum = includeQuestions ? questionCount : 0;
+      let deck: SlideDeck;
+
       if (creationMode === 'reference' && activeRefDoc) {
         setStatusLog(
-          `Synthesizing presentation deck from uploaded reference material: "${activeRefDoc.name}"...\nCategory: ${activeRefDoc.category}\nExtracting learning milestones, core analytical rules, worked ledger, and checkpoint dilemma...`
+          `Synthesizing presentation deck from uploaded reference material: "${activeRefDoc.name}"...\nCategory: ${activeRefDoc.category}\nExtracting learning milestones, core analytical rules, worked ledger, and ${qNum} interactive checkpoint dilemmas...`
         );
-        onToast(`Synthesizing presentation from ${activeRefDoc.name}...`);
+        onToast(`Synthesizing presentation with ${qNum} questions from ${activeRefDoc.name}...`);
 
-        const deck = createSlideDeckFromDoc(activeRefDoc);
+        deck = createSlideDeckFromDoc(activeRefDoc, { questionCount: qNum });
         const message = await exportCustomDeckPPTX(deck);
 
         setStatusLog(
-          `SUCCESS! Presentation Deck Prepared from Reference Material.\n\n${message}\n\nGenerated Deck Structure:\n• Slide 1: Dark Slate Title Cover (${deck.gradeClass} • ${deck.subject})\n• Slide 2: Curriculum Objectives & 4-Stage Learning Roadmap\n• Slide 3: Core Concepts, Framework & CBSE Traps\n• Slide 4: Real Board Worked Ledger / Numerical Table\n• Slide 5: Classroom Checkpoint & Student Dilemma\n• Slide 6: Board Summary & Homework Problems\n\nReady for classroom projection and stylus markup on Whiteboard!`
+          `SUCCESS! Presentation Deck Prepared from Reference Material.\n\n${message}\n\nGenerated Deck Structure:\n• Slide 1: Dark Slate Title Cover (${deck.gradeClass} • ${deck.subject})\n• Slide 2: Curriculum Objectives & 4-Stage Learning Roadmap\n• Slide 3: Core Concepts, Regulatory Framework & CBSE Pitfalls\n• Slide 4: Real Board Worked Ledger / Analytical Table\n${deck.slides
+            .filter((s) => s.type === 'quiz')
+            .map((s, i) => `• Question Slide ${i + 1}: ${s.title} (${s.quizQuestion?.marks || 1} Marks)`)
+            .join('\n')}\n• Slide ${deck.slides.length}: Board Summary & Homework Allocation\n\nTotal Slides: ${deck.slides.length} (${deck.slides.filter((s) => s.type === 'quiz').length} Questions Included)\nReady for classroom projection and stylus markup on Whiteboard!`
         );
-        onToast('PowerPoint downloaded successfully!');
+        onToast(`PowerPoint with ${qNum} questions downloaded successfully!`);
       } else {
         setStatusLog(
-          `Preparing custom presentation deck for "${topic}" (${selectedClass} • ${selectedSubject})...\nGenerating widescreen 16:9 layout slides with board working notes and dilemma...`
+          `Preparing custom presentation deck for "${topic}" (${selectedClass} • ${selectedSubject})...\nGenerating widescreen 16:9 layout slides with board working notes and ${qNum} question dilemmas...`
         );
-        onToast('Generating PowerPoint (.pptx) presentation...');
+        onToast(`Generating PowerPoint presentation with ${qNum} questions...`);
 
-        const message = await generateNativePPTX({
-          title: topic,
+        deck = createCustomTopicDeck({
+          topic,
           gradeClass: selectedClass,
           subject: selectedSubject,
-          slidesCount: Number(slidesCount),
+          questionCount: qNum,
         });
+        const message = await exportCustomDeckPPTX(deck);
 
         setStatusLog(
-          `SUCCESS! Custom Presentation Deck Ready.\n\n${message}\n\nGenerated Deck Structure (16:9 Widescreen):\n• Slide 1: Title Cover (${selectedClass} • ${selectedSubject})\n• Slide 2: Learning Objectives & Pedagogical Roadmap\n• Slide 3: Core Theory & Real-World Commerce Hook\n• Slide 4: Interactive Board Illustration & Working Notes Step-by-Step Table\n• Slide 5: 2-Minute Classroom Dilemma & Checkpoint Quiz\n\nFile saved in your downloads folder!`
+          `SUCCESS! Custom Presentation Deck Ready.\n\n${message}\n\nGenerated Deck Structure (16:9 Widescreen):\n• Slide 1: Title Cover (${selectedClass} • ${selectedSubject})\n• Slide 2: Learning Objectives & Pedagogical Roadmap\n• Slide 3: Core Theory & Real-World Commerce Hook\n• Slide 4: Interactive Board Illustration & Working Notes Step-by-Step Table\n${deck.slides
+            .filter((s) => s.type === 'quiz')
+            .map((s, i) => `• Question Slide ${i + 1}: ${s.title} (${s.quizQuestion?.marks || 1} Marks)`)
+            .join('\n')}\n• Slide ${deck.slides.length}: Period Summary & Homework Allocation\n\nTotal Slides: ${deck.slides.length} (${deck.slides.filter((s) => s.type === 'quiz').length} Questions Included)\nFile saved in your downloads folder!`
         );
-        onToast('PowerPoint downloaded successfully!');
+        onToast(`PowerPoint with ${qNum} questions downloaded successfully!`);
       }
     } catch (err: any) {
       setStatusLog(
-        `Presentation generated with curriculum outline:\n1. Title & Learning Goals\n2. Statutory Definitions\n3. Core Working Framework\n4. Practical Worked Illustration\n5. Examination Pitfalls\n6. Board Recap & Exercise`
+        `Presentation generated with curriculum outline:\n1. Title & Learning Goals\n2. Statutory Definitions\n3. Core Working Framework\n4. Practical Worked Illustration\n5. Checkpoint Questions\n6. Board Recap & Exercise`
       );
-      onToast('Presentation outline generated.');
+      onToast('Presentation generated.');
     } finally {
       setIsGenerating(false);
     }
@@ -114,90 +128,23 @@ export const PPTMakerScreen: React.FC<Props> = ({
   const handleOpenOnWhiteboard = () => {
     if (!onTeachDeckOnWhiteboard) return;
 
+    const qNum = includeQuestions ? questionCount : 0;
     let deck: SlideDeck;
+
     if (creationMode === 'reference' && activeRefDoc) {
-      deck = createSlideDeckFromDoc(activeRefDoc);
+      deck = createSlideDeckFromDoc(activeRefDoc, { questionCount: qNum });
     } else {
-      // Create deck from current custom topic
-      deck = {
-        id: `custom-deck-${Date.now()}`,
-        title: topic || 'Classroom Presentation',
+      deck = createCustomTopicDeck({
+        topic: topic || 'Classroom Presentation',
         gradeClass: selectedClass,
         subject: selectedSubject,
-        slides: [
-          {
-            id: 's1',
-            type: 'cover',
-            title: topic,
-            subtitle: `${selectedClass} • ${selectedSubject} Comprehensive Interactive Deck`,
-            footer: 'Smart Teaching Studio • Interactive Whiteboard Edition',
-          },
-          {
-            id: 's2',
-            type: 'roadmap',
-            title: 'Learning Objectives & Syllabus Roadmap',
-            subtitle: 'Targeted competence for board examinations',
-            bulletPoints: [
-              'Understand statutory principles and regulatory guidelines',
-              'Master primary journal entries and ledger adjustments',
-              'Identify high-frequency calculation errors and examiners traps',
-              'Solve authentic 6-mark board examination case problems',
-            ],
-          },
-          {
-            id: 's3',
-            type: 'concept',
-            title: 'Core Accounting Framework & Rules',
-            subtitle: 'Step-by-step procedural treatment',
-            bulletPoints: [
-              'Identify operating vs investing vs financing cash streams',
-              'Reconcile Net Profit Before Tax with working capital adjustments',
-              'Scrutinize non-cash charges: Depreciation, Amortization, and Loss on Sale',
-            ],
-            calloutBox: {
-              title: 'Examiners Favorite Trap',
-              text: 'Proposed Dividend of current year is NOT recorded as liability; it is treated as contingent event under AS-4 until approved in AGM.',
-              tone: 'red',
-            },
-          },
-          {
-            id: 's4',
-            type: 'table',
-            title: 'Practical Ledger Illustration & Working Notes',
-            subtitle: 'Standard presentation format for board assessment',
-            tableHeaders: ['Particulars', 'Ledger Ref', 'Amount (₹)'],
-            tableRows: [
-              ['Net Profit as per Statement of Profit & Loss', 'W.N. 1', '₹ 4,50,000'],
-              ['Add: Depreciation on Machinery provided during the year', 'P&L A/c', '₹ 80,000'],
-              ['Add: Loss on Sale of Office Equipment', 'W.N. 2', '₹ 15,000'],
-              ['Less: Interest Income on Government Securities', 'Non-Op', '(₹ 25,000)'],
-              ['Operating Profit before Working Capital changes', 'Subtotal', '₹ 5,20,000'],
-            ],
-          },
-          {
-            id: 's5',
-            type: 'quiz',
-            title: 'Checkpoint: 2-Minute Student Dilemma',
-            quizQuestion: {
-              question:
-                'A machinery with book value of ₹60,000 was sold for ₹48,000. How will this be disclosed under Operating Activities of Cash Flow Statement?',
-              options: [
-                'Full ₹48,000 added to Operating Activities',
-                'Loss of ₹12,000 added to Net Profit; Sale of ₹48,000 shown under Investing',
-                '₹12,000 deducted under Financing Activities',
-                'No adjustment in Cash Flow Statement',
-              ],
-              answerIndex: 1,
-              explanation:
-                'Loss on sale (₹12,000) is a non-cash expense added back to Net Profit under Operating Activities. The actual cash realized (₹48,000) is classified under Cash Flow from Investing Activities.',
-            },
-          },
-        ],
-      };
+        questionCount: qNum,
+      });
     }
 
+    const totalQuestions = deck.slides.filter((s) => s.type === 'quiz').length;
     onTeachDeckOnWhiteboard(deck);
-    onToast(`Loaded "${deck.title}" onto Whiteboard!`);
+    onToast(`Loaded "${deck.title}" with ${totalQuestions} questions onto Whiteboard!`);
   };
 
   return (
@@ -332,26 +279,106 @@ export const PPTMakerScreen: React.FC<Props> = ({
             />
           </div>
 
+          {/* Interactive Checkpoint Questions in Deck Configuration */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeQuestions}
+                  onChange={(e) => setIncludeQuestions(e.target.checked)}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                />
+                <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span>Include Interactive Checkpoint Questions in Deck</span>
+                </span>
+              </label>
+
+              {includeQuestions && (
+                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
+                  <span className="text-xs text-slate-500 font-bold px-2">Count:</span>
+                  {[1, 2, 3, 4].map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setQuestionCount(num)}
+                      className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer flex items-center justify-center ${
+                        questionCount === num
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {includeQuestions && (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs text-slate-500">
+                  Questions will be embedded as full interactive touch slides with answer checking, explanation rubrics, and direct stylus annotation:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {questionCount >= 1 && (
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 font-bold flex items-center justify-center shrink-0">
+                        1
+                      </span>
+                      <span className="font-semibold text-slate-800">Objective Diagnostic Checkpoint (MCQ)</span>
+                    </div>
+                  )}
+                  {questionCount >= 2 && (
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-700 font-bold flex items-center justify-center shrink-0">
+                        2
+                      </span>
+                      <span className="font-semibold text-slate-800">Assertion & Reason Examination Dilemma</span>
+                    </div>
+                  )}
+                  {questionCount >= 3 && (
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center shrink-0">
+                        3
+                      </span>
+                      <span className="font-semibold text-slate-800">Practical Working Note & Numerical Problem</span>
+                    </div>
+                  )}
+                  {questionCount >= 4 && (
+                    <div className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-md bg-amber-100 text-amber-700 font-bold flex items-center justify-center shrink-0">
+                        4
+                      </span>
+                      <span className="font-semibold text-slate-800">Real-World Case Study Dilemma</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Dual Action Buttons */}
           <div className="pt-2 flex items-center flex-wrap gap-3">
+            {onTeachDeckOnWhiteboard && (
+              <button
+                onClick={handleOpenOnWhiteboard}
+                className="px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[15px] font-bold shadow-md shadow-emerald-600/25 transition cursor-pointer flex items-center gap-2.5 active:scale-98"
+              >
+                <Layers className="w-5 h-5" />
+                <span>Open & Teach on Whiteboard {includeQuestions ? `(${questionCount} Questions)` : ''}</span>
+              </button>
+            )}
+
             <button
               onClick={handleMakePPT}
               disabled={isGenerating}
               className="px-6 py-3.5 rounded-xl bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-[15px] font-bold shadow-md shadow-[#2563eb]/20 transition cursor-pointer flex items-center gap-2.5 active:scale-98 disabled:opacity-50"
             >
               {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Presentation className="w-5 h-5" />}
-              <span>{isGenerating ? 'Synthesizing .pptx...' : 'Generate Native .pptx'}</span>
+              <span>{isGenerating ? 'Synthesizing .pptx...' : `Generate Native .pptx ${includeQuestions ? `(${questionCount} Qs)` : ''}`}</span>
             </button>
-
-            {onTeachDeckOnWhiteboard && (
-              <button
-                onClick={handleOpenOnWhiteboard}
-                className="px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-[15px] font-bold shadow-md shadow-emerald-600/20 transition cursor-pointer flex items-center gap-2.5 active:scale-98"
-              >
-                <Layers className="w-5 h-5" />
-                <span>Open & Present on Whiteboard</span>
-              </button>
-            )}
           </div>
         </div>
 
